@@ -1,0 +1,73 @@
+version: "3.7"
+
+services:
+    # image project
+    app:
+        container_name: pzn_web_app
+        build:
+            context: .
+            dockerfile: Dockerfile
+        image: pzn/web_app
+        restart: unless-stopped
+        working_dir: /var/www/
+        volumes:
+            - ./:/var/www
+        depends_on: 
+            - redis
+        networks: 
+            - web_app
+    
+    # nginx
+    nginx:
+        container_name: pzn_nginx
+        image: nginx:alpine
+        restart: unless-stopped
+        ports: 
+            - "80:80"
+        volumes: 
+            - ./:/var/www
+            - ./docker/nginx/:/etc/nginx/conf.d/
+        networks: 
+            - web_app
+
+    # db mysql
+    mysql:
+        container_name: pzn_mysql
+        image: mysql:5.7.22
+        restart: unless-stopped
+        environment: 
+            MYSQL_DATABASE: ${DB_DATABASE}
+            MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+            MYSQL_PASSWORD: ${DB_PASSWORD}
+            MYSQL_USER: ${DB_USERNAME}
+        volumes: 
+            - ./.docker/mysql/dbdata:/var/lib/mysql
+        ports: 
+            - "3388:3306"
+        networks: 
+            - web_app
+
+    # queue
+    queue:
+        container_name: pzn_queue
+        image: pzn/web_app
+        restart: unless-stopped
+        command: "php artisan queue:work"
+        volumes: 
+            - ./:/var/www
+        depends_on: 
+            - redis
+            - app
+        networks: 
+            - web_app
+
+    # redis
+    redis:
+        container_name: pzn_redis
+        image: redis:latest
+        networks: 
+            - web_app
+
+networks: 
+    web_app:
+        driver: bridge
